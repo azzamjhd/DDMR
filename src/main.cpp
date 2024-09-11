@@ -3,6 +3,8 @@
 
 int speed = 0;
 
+#define Ultrasonic1 12
+
 void setup() {
     Serial.begin(9600);
     setupMotorPins();
