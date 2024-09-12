@@ -1,8 +1,18 @@
 #include <Arduino.h>
+#include <PID_v1.h>
 #include "pins.h"
 
-int speed = 0;
-bool isForward = true;
+
+// Right motor position Set Point
+double posSPR = 500;
+// Left motor position Set Point
+double posSPL = 500; 
+// PID input and output
+double posInR, posOutR, posInL, posOutL;
+double Kp = 2, Ki = 5, Kd = 1;
+// PID objects
+PID rightPositionPID(&posInR, &posOutR, &posSPR, Kp, Ki, Kd, DIRECT);
+PID leftPositionPID(&posInL, &posOutL, &posSPL, Kp, Ki, Kd, DIRECT);
 
 // Encoder and Motor objects
 Encoder rightEncoder(R_ENC_A, R_ENC_B);
@@ -10,30 +20,25 @@ Encoder leftEncoder(L_ENC_A, L_ENC_B);
 Motor rightMotor(PWM_A, A_IN_1, A_IN_2);
 Motor leftMotor(PWM_B, B_IN_1, B_IN_2);
 
+
 void setup() {
     Serial.begin(9600);
     attachInterrupt(digitalPinToInterrupt(R_ENC_A), []() { rightEncoder.update(); }, CHANGE);
     attachInterrupt(digitalPinToInterrupt(L_ENC_A), []() { leftEncoder.update(); }, CHANGE);
+
+    rightPositionPID.SetMode(AUTOMATIC);
+    leftPositionPID.SetMode(AUTOMATIC);
 }
 
 void loop() {
-    if (speed < 256 && isForward) {
-        speed++;
-    } else if ( speed < 256 && !isForward) {
-        speed--;
-    }
+    Serial.print(rightEncoder.getCount()); Serial.print("\t");
+    Serial.println(leftEncoder.getCount());
 
-    if (speed == 255) {
-        isForward = false;
-        rightMotor.setDir(STOP);
-    } else if (speed == 0) {
-        isForward = true;
-    }
+    posInR = rightEncoder.getCount();
+    posInL = leftEncoder.getCount();
+    rightPositionPID.Compute();
+    leftPositionPID.Compute();
 
-    Serial.print("Speed: "); Serial.println(speed);
-    Serial.print("Right Encoder: "); Serial.println(rightEncoder.getCount());
-    Serial.print("Left Encoder: "); Serial.println(leftEncoder.getCount());
-
-    rightMotor.setSpeed(speed);
-    leftMotor.setSpeed(speed);
+    rightMotor.setSpeed(posOutR);
+    leftMotor.setSpeed(posOutL);
 }
