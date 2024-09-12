@@ -98,8 +98,18 @@ public:
         pinMode(in2, OUTPUT);
     }
 
+    // set speed of motor from -255 to 255
     void setSpeed(int speed) {
-        analogWrite(this->pwm, speed);
+        if (speed > 0) {
+            this->setDir(FORWARD);
+            analogWrite(this->pwm, constrain(speed, 0, 255));
+        } else if (speed < 0) {
+            this->setDir(BACKWARD);
+            analogWrite(this->pwm, constrain(-speed, 0, 255));
+        } else {
+            this->setDir(STOP);
+            analogWrite(this->pwm, 0);
+        }
     }
 
     void setDir(uint8_t dir) {
