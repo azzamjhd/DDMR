@@ -57,7 +57,6 @@
 // Left motor PWM pin
 #define PWM_B 6
 
-
 /** Motor class */
 class MotorEncoder {
 private:
@@ -66,31 +65,46 @@ private:
     int pinA, pinB;
     int count, lastCount;
     uint8_t curretState, lastState;
-    float wheelDiameter = 0;
-    float countPerRev = 0;
-    float speed = 0;
+    float wheelDiameter = 0; // wheel diameter in mm
+    int countPerRev = 0;
     unsigned long lastTime = 0;
 public:
-    MotorEncoder(int pwm, int in1, int in2, int pinA, int pinB){}
-    void setSpeed(int speed) {}
-    void setDir(uint8_t dir) {}
-    void setCountPerRev(float countPerRev) {}
-    void setWheelDiameter(float wheelDiameter) {}
-    void update() {}
-    int getCount() {}
-    float getSpeed() {}
-    float getDistance() {}
+    MotorEncoder(int pwm, int in1, int in2, int pinA, int pinB);
+    void setDir(uint8_t dir);
+    void setSpeed(int speed);
+    void setCountPerRev(float countPerRev);
+    void setWheelDiameter(float wheelDiameter);
+    void update();
+    int getCount();
+    float getSpeed();
+    float getDistance();
 };
 
 class Ultrasonic {
 private:
     int echoPin;
     int trigPin;
-    long duration;
-    int distance;
+    unsigned long lastTriggerTime;
+    unsigned long echoStartTime;
+    unsigned long timeout;
+    bool waitingForEcho;
 public:
-    Ultrasonic(int echoPin, int trigPin) {}
-    int getDistance() {}
+    Ultrasonic(int echoPin, int trigPin, unsigned long timeout = 20000);
+    float getDistance();
+    void trigger();
+};
+
+class DDMRobot {
+private:
+    MotorEncoder *rightMotor;
+    MotorEncoder *leftMotor;
+    float wheelDistance;
+public:
+    DDMRobot(MotorEncoder *rightMotor, MotorEncoder *leftMotor);
+    void setWheelDistance(float wheelDistance);
+    float getHeading();
+    float getAngularSpeed();
+    float getR_ICR();
 };
 
 #endif // DEFINE_BASE_H
