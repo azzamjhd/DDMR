@@ -1,8 +1,10 @@
 #include "base.h"
 #include <PID_v1.h>
 
+
+bool forward = true;
 // Right motor position Set Point
-double posSPR = 1000;
+double posSPR = 2000;
 // Left motor position Set Point
 double posSPL = 2000; 
 // PID input and output
@@ -44,8 +46,15 @@ void positionControl() {
     leftMotor.setSpeed(posOutL);
 
     if (abs(abs(posInR) - abs(posSPR)) < 5 && abs(abs(posInL) - abs(posSPL)) < 5) {
-        posSPR += 1000;
-        posSPL += 2000;
+        if (forward) {
+            posSPR += 2000;
+            posSPL += 2000;
+            forward = false;
+        } else {
+            posSPR -= 2000;
+            posSPL -= 2000;
+            forward = true;
+        }
     }
 
     Serial.print(posOutR); Serial.print("\t");
