@@ -1,19 +1,17 @@
 #include "base.h"
 #include <PID_v1.h>
-#include <I2Cdev.h>
-#include <MPU6050_6Axis_MotionApps20.h>
 
 // Right motor position Set Point
-double posSPR = 2000;
+double posSPR = 1000;
 // Left motor position Set Point
-double posSPL = -2000; 
+double posSPL = 2000; 
 // PID input and output
 double posInR, posOutR, posInL, posOutL;
-double Kp = 1, Ki = 1, Kd = 0.1;
+double Kp = 2, Ki = 1, Kd = 0.1;
 // PID objects
 PID rightPositionPID(&posInR, &posOutR, &posSPR, Kp, Ki, Kd, P_ON_M, DIRECT);
 PID leftPositionPID(&posInL, &posOutL, &posSPL, Kp, Ki, Kd, P_ON_M, DIRECT);
-
+ 
 // Encoder and Motor objects
 MotorEncoder rightMotor(PWM_A, A_IN_1, A_IN_2, R_ENC_A, R_ENC_B);
 MotorEncoder leftMotor(PWM_B, B_IN_1, B_IN_2, L_ENC_A, L_ENC_B);
@@ -45,12 +43,17 @@ void positionControl() {
     rightMotor.setSpeed(posOutR);
     leftMotor.setSpeed(posOutL);
 
+    if (abs(abs(posInR) - abs(posSPR)) < 5 && abs(abs(posInL) - abs(posSPL)) < 5) {
+        posSPR += 1000;
+        posSPL += 2000;
+    }
+
     Serial.print(posOutR); Serial.print("\t");
     Serial.print(posOutL); Serial.println("\t");
 }
 
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
     attachInterrupt(digitalPinToInterrupt(R_ENC_A), []() { rightMotor.update(); }, CHANGE);
     attachInterrupt(digitalPinToInterrupt(L_ENC_A), []() { leftMotor.update(); }, CHANGE);
 
