@@ -78,14 +78,14 @@ private:
     int _pwm;
     int _in1, _in2;
     int _pinA, _pinB;
-    volatile uint32_t _count;
+    volatile uint64_t _count;
     uint8_t _curretState, _lastState;
     float _wheelDiameter = 0; // wheel diameter in mm
     int _countPerRev = 0;
     float _MAX_VELOCITY = 1.0; // m/s
 
     MotorData _motor_data;
-    uint32_t _lastCount = 0;
+    uint64_t _lastCount = 0;
     unsigned long _lastTime = 0;
     
 

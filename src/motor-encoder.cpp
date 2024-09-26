@@ -91,13 +91,13 @@ void MotorEncoder::setDir(MotorDirection dir) {
 }
 
 void MotorEncoder::set_velocity(float velocity) {
-    velocity = _reverse ? -velocity : velocity;
+    // velocity = _reverse ? -velocity : velocity;
     velocity = constrain(velocity, -_MAX_VELOCITY, _MAX_VELOCITY);
     _setpoint = velocity;
 }
 
 void MotorEncoder::setSpeed(int speed) {
-    speed = _reverse ? -speed : speed;
+    // speed = _reverse ? -speed : speed;
     if (speed > 0) {
         setDir(MotorDirection::FORWARD);
         analogWrite(_pwm, speed);
@@ -113,15 +113,15 @@ void MotorEncoder::setSpeed(int speed) {
 void MotorEncoder::update() {
     _curretState = digitalRead(_pinA) << 2 | digitalRead(_pinB);
     if (_curretState == 0b100 && _lastState == 0b01) {
-        _count = _reverse ? _count + 1 : _count - 1;
+        _count++;
     } else if (_curretState == 0b101 && _lastState == 0b00) {
-        _count = _reverse ? _count - 1 : _count + 1;
+        _count--;
     }
     _lastState = _curretState;
 }
 
 int MotorEncoder::getCount() {
-    return _reverse ? -_count : _count;
+    return _reverse ? _count * -1 : _count;
 }
 
 float MotorEncoder::_computeRPM() {
