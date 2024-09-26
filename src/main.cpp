@@ -18,20 +18,31 @@ void setup() {
     attachInterrupt(digitalPinToInterrupt(R_ENC_A), []() { rightMotor.update(); }, CHANGE);
     attachInterrupt(digitalPinToInterrupt(L_ENC_A), []() { leftMotor.update(); }, CHANGE);
 
+    rightMotor.setMaxVelocity(1.0);
+    leftMotor.setMaxVelocity(1.0);
+
     robot.updateMotorGains(Kp, Ki, Kd);
-    robot.move(0.3, 0.5);
+    robot.move(0.01, 0);
+
+    rightMotor.set_velocity(0);
+    leftMotor.set_velocity(0.1);
 }
 
 void loop() {
-    robot.run();
-    robot.getMotorData(rightMotorData, leftMotorData);
-    robot.getPose(pose);
+    rightMotor.run();
+    leftMotor.run();
+    rightMotor.getMotorData(rightMotorData);
+    leftMotor.getMotorData(leftMotorData);
 
-    Serial.print(leftMotorData.velocity); Serial.print("\t");
-    Serial.print(rightMotorData.velocity); Serial.print("\t");
-    Serial.print(pose.x); Serial.print("\t");
-    Serial.print(pose.y); Serial.print("\t");
-    Serial.print(pose.theta); Serial.print("\t");
+    // robot.run();
+    // robot.getMotorData(rightMotorData, leftMotorData);
+    // robot.getPose(pose);
+
+    Serial.print(leftMotorData.velocity*100); Serial.print("\t");
+    Serial.print(rightMotorData.velocity*100); Serial.print("\t");
+    // Serial.print(pose.x); Serial.print("\t");
+    // Serial.print(pose.y); Serial.print("\t");
+    // Serial.print(pose.theta); Serial.print("\t");
 
     Serial.println();
 }

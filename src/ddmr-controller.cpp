@@ -4,12 +4,11 @@
 // =========== DDMR Controller Class ========================
 // ===============================================
 
-DDMRobot::DDMRobot(MotorEncoder *rightMotor, MotorEncoder *leftMotor, float wheelBaseDistance) :
-    _rightMotor(rightMotor),
-    _leftMotor(leftMotor),
-    _wheelBaseDistance(wheelBaseDistance),
-    _motorUpdateTimer(1000/_MOTOR_RUN_FREQ) // hz to ms
-{
+DDMRobot::DDMRobot(MotorEncoder *rightMotor, MotorEncoder *leftMotor, float wheelBaseDistance) {
+    _rightMotor = rightMotor;
+    _leftMotor = leftMotor;
+    _wheelBaseDistance = wheelBaseDistance;
+    _motorUpdateTimer.set_interval(1000/_MOTOR_RUN_FREQ); // hz to ms
     _pose = {0.0, 0.0, 0.0};
     _cmdVel = {0.0, 0.0};
     _prevRightDistance = 0;

@@ -91,7 +91,7 @@ private:
 
     double _setpoint = 0, _input = 0, _output = 0;
     double _Kp = 0, _Ki = 0, _Kd = 0;
-    PID _pid = PID(&_input, &_output, &_setpoint, _Kp, _Ki, _Kd, P_ON_M, DIRECT);
+    PID _pid = PID(&_input, &_output, &_setpoint, _Kp, _Ki, _Kd, DIRECT);
 
     void setDir(MotorDirection);
     float _computeRPM(void);
@@ -159,7 +159,7 @@ class DDMRobot {
 private:
     MotorEncoder *_rightMotor;
     MotorEncoder *_leftMotor;
-    TimerAPI _motorUpdateTimer;
+    TimerAPI _motorUpdateTimer = TimerAPI(0);
 
     Pose _pose;
     CmdVel _cmdVel;
@@ -171,7 +171,7 @@ private:
     void _computePose(void);
     void _computeWheelSpeeds();
 public:
-    DDMRobot(MotorEncoder *rightMotor, MotorEncoder *leftMotor, float wheelBaseDistance);
+    DDMRobot(MotorEncoder*, MotorEncoder*, float);
     void run(void);
     void reset(void);
     void resetPose(void);

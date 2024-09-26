@@ -21,8 +21,8 @@ MotorEncoder::MotorEncoder(int pwm, int in1, int in2, int pinA, int pinB, float 
     pinMode(_pwm, OUTPUT);
     pinMode(_in1, OUTPUT);
     pinMode(_in2, OUTPUT);
-    pinMode(_pinA, INPUT_PULLUP);
-    pinMode(_pinB, INPUT_PULLUP);
+    pinMode(_pinA, INPUT);
+    pinMode(_pinB, INPUT);
 
     _pid.SetMode(AUTOMATIC);
     _pid.SetOutputLimits(-255, 255);
