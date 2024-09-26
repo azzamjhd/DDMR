@@ -2,6 +2,8 @@
 #define DEFINE_BASE_H
 
 #include <Arduino.h>
+#include <PID_v1.h>
+#include <timer_api.hpp>
 
 /************************************
  * MPU6050
@@ -57,54 +59,135 @@
 // Left motor PWM pin
 #define PWM_B 6
 
+typedef struct {
+    float rpm;               //< Revolutions per minute (RPM) of the motor.
+    float angular_velocity;  //< Angular velocity of the motor (in rad/s).
+    float velocity;          //< Linear velocity of the motor (in m/s).
+    float distance;          //< Total Traveled distance (in m).
+    float angle;             //< Angular position of the motor (in radians).
+} MotorData;
+
+enum class MotorMode { OPEN_LOOP, CLOSED_LOOP };
+enum class MotorDirection { FORWARD, BACKWARD, STOP };
+
+
 /** Motor class */
 class MotorEncoder {
 private:
-    int pwm;
-    int in1, in2;
-    int pinA, pinB;
-    int count, lastCount;
-    uint8_t curretState, lastState;
-    float wheelDiameter = 0; // wheel diameter in mm
-    int countPerRev = 0;
-    unsigned long lastTime = 0;
+    bool _reverse;
+    int _pwm;
+    int _in1, _in2;
+    int _pinA, _pinB;
+    volatile uint32_t _count;
+    uint8_t _curretState, _lastState;
+    float _wheelDiameter = 0; // wheel diameter in mm
+    int _countPerRev = 0;
+    float _MAX_VELOCITY = 1.0; // m/s
+
+    MotorData _motor_data;
+    uint32_t _lastCount = 0;
+    unsigned long _lastTime = 0;
+    
+
+    double _setpoint = 0, _input = 0, _output = 0;
+    double _Kp = 0, _Ki = 0, _Kd = 0;
+    PID _pid = PID(&_input, &_output, &_setpoint, _Kp, _Ki, _Kd, P_ON_M, DIRECT);
+
+    void setDir(MotorDirection);
+    float _computeRPM(void);
+    float _computeAngularVelocity(float rpm);
+    float _computeVelocity(float angular_velocity);
+    float _computeDistance(void);
+    float _computeAngle(void);
 public:
-    MotorEncoder(int pwm, int in1, int in2, int pinA, int pinB);
-    void setDir(uint8_t dir);
-    void setSpeed(int speed);
-    void setCountPerRev(float countPerRev);
-    void setWheelDiameter(float wheelDiameter);
-    void update();
-    int getCount();
-    float getSpeed();
-    float getDistance();
+    /**
+     * @brief Construct a new Motor Encoder object
+     * @param wheelDiameter Wheel diameter in meters
+     * @param countPerRev Encoder Count per revolution
+     */
+    MotorEncoder(int pwm, int in1, int in2, int pinA, int pinB, float wheelDiameter, int countPerRev, bool reverse = false);
+
+    void run(void);
+    void reset(void);
+    void set_velocity(float);
+    void setSpeed(int);
+    void setMaxVelocity(float);
+    void updateGains(double, double, double);
+    void getGains(double&, double&, double&);
+    float getWheelDiameter();
+    int getCountPerRev();
+
+    // Encoder functions
+    void update(void);
+    void computeMotorData(void);
+    int getCount(void);
+    void getMotorData(MotorData&);
 };
 
+
+
+/** Ultrasonic class */
 class Ultrasonic {
 private:
-    int echoPin;
-    int trigPin;
-    unsigned long lastTriggerTime;
-    unsigned long echoStartTime;
-    unsigned long timeout;
-    bool waitingForEcho;
+    int _echoPin;
+    int _trigPin;
+    unsigned long _lastTriggerTime;
+    unsigned long _echoStartTime;
+    unsigned long _timeout;
+    bool _waitingForEcho;
 public:
     Ultrasonic(int echoPin, int trigPin, unsigned long timeout = 20000);
     float getDistance();
     void trigger();
 };
 
+
+
+typedef struct {
+    float x;
+    float y;
+    float theta;
+} Pose;
+
+typedef struct {
+    float x;
+    float w;
+} CmdVel;
+
+/** DDMRobot class */
 class DDMRobot {
 private:
-    MotorEncoder *rightMotor;
-    MotorEncoder *leftMotor;
-    float wheelDistance;
+    MotorEncoder *_rightMotor;
+    MotorEncoder *_leftMotor;
+    TimerAPI _motorUpdateTimer;
+
+    Pose _pose;
+    CmdVel _cmdVel;
+    float _wheelBaseDistance;
+    float _prevRightDistance;
+    float _prevLeftDistance;
+    int _MOTOR_RUN_FREQ = 20;
+
+    void _computePose(void);
+    void _computeWheelSpeeds();
 public:
-    DDMRobot(MotorEncoder *rightMotor, MotorEncoder *leftMotor);
-    void setWheelDistance(float wheelDistance);
-    float getHeading();
-    float getAngularSpeed();
-    float getR_ICR();
+    DDMRobot(MotorEncoder *rightMotor, MotorEncoder *leftMotor, float wheelBaseDistance);
+    void run(void);
+    void reset(void);
+    void resetPose(void);
+    void updateMotorGains(double, double, double);
+
+    void move(float, float);
+    void moveOpenLoop(int speedR, int speedL);
+    void stop(void);
+    void moveForward(void);
+    void moveBackward(void);
+    void turnLeft(void);
+    void turnRight(void);
+
+    void getMotorData(MotorData&, MotorData&);
+    void getMotorGains(double&, double&, double&);
+    void getPose(Pose&);
 };
 
 #endif // DEFINE_BASE_H
