@@ -179,3 +179,11 @@ float MotorDriver::_computeWheelAngle() {
     int count = _encoder->getCount();
     return count * 2 * PI / _countPerRev;
 }
+
+void MotorDriver::_computeMotorData() {
+    float rpm = _computeRPM();
+    _motorData.angularVelocity = _computeAngularVelocity(rpm);
+    _motorData.velocity = _computeVelocity(_motorData.angularVelocity);
+    _motorData.distance = _computeDistance();
+    _motorData.angle = _computeWheelAngle();
+}
