@@ -21,10 +21,10 @@ MotorDriver::MotorDriver(uint8_t pinEn,
     : _pinEn(pinEn), 
       _pinIn1(pinIn1), 
       _pinIn2(pinIn2),
-      _encoder(encoder),
       _wheelRadius(wheelRadius),
-      _countPerRev(countPerRev), 
-      _reverse(reverse) 
+      _countPerRev(countPerRev),
+      _reverse(reverse),
+      _encoder(encoder)
 {
         _pid.SetMode(AUTOMATIC);
         _pid.SetOutputLimits(-255, 255);
@@ -68,23 +68,24 @@ void MotorDriver::setPWM(int pwm, MotorMode mode) {
 }
 
 void MotorDriver::_setDirection(MotorDirection dir) {
-    byte in1 = _reverse ^ (dir == MotorDirection::CW);
-    byte in2 = _reverse ^ (dir == MotorDirection::CCW);
+    bool in1State = LOW;
+    bool in2State = LOW;
 
     switch (dir) {
         case MotorDirection::CW:
-            digitalWrite(_pinIn1, in1);
-            digitalWrite(_pinIn2, in2);
+            in1State = _reverse ? HIGH : LOW;
+            in2State = _reverse ? LOW : HIGH;
             break;
         case MotorDirection::CCW:
-            digitalWrite(_pinIn1, in1);
-            digitalWrite(_pinIn2, in2);
+            in1State = _reverse ? LOW : HIGH;
+            in2State = _reverse ? HIGH : LOW;
             break;
         case MotorDirection::STOP:
-            digitalWrite(_pinIn1, LOW);
-            digitalWrite(_pinIn2, LOW);
             break;
     }
+
+    digitalWrite(_pinIn1, in1State);
+    digitalWrite(_pinIn2, in2State);
 }
 
 void MotorDriver::setMode(MotorMode mode) {
@@ -102,6 +103,10 @@ void MotorDriver::setVelocity(float velocity) {
     }
     _motorMode = MotorMode::CLOSED_LOOP;
     _setpoint = velocity;
+}
+
+void MotorDriver::setMaxVelocity(float maxVelocity) {
+    _MAX_VELOCITY = maxVelocity;
 }
 
 void MotorDriver::getMotorData(MotorData &motorData) {
@@ -135,31 +140,45 @@ void MotorDriver::run() {
         _pid.Compute();
         setPWM(_output, MotorMode::CLOSED_LOOP);
     }
+    // Serial.print("SP:");Serial.print(_setpoint);Serial.print(",");
     _sendPWM();
 }
 
 void MotorDriver::printStatus() {
-    Serial.print("w: ");
-    Serial.print(_motorData.angularVelocity);
-    Serial.print(" rad/s | v: ");
-    Serial.print(_motorData.velocity);
-    Serial.print(" m/s | d: ");
-    Serial.print(_motorData.distance);
-    Serial.print(" m | angel: ");
-    Serial.print(_motorData.angle);
-    Serial.println(" rad | pwm:");
-    Serial.println(_pwm);
+    // Serial.print("w: ");
+    Serial.print(_motorData.angularVelocity); Serial.print("\t");
+    // Serial.print(" rad/s | v: ");
+    Serial.print(_motorData.velocity); Serial.print("\t");
+    // Serial.print(" m/s | d: ");
+    Serial.print(_motorData.distance); Serial.print("\t");
+    // Serial.print(" m | angel: ");
+    Serial.print(_motorData.angle); Serial.print("\t");
+    // Serial.println(" rad | pwm:");
+    Serial.print(_pwm);
 }
 
 float MotorDriver::_computeRPM() {
     int count = _encoder->getCount();
     unsigned long currentTime = millis();
     unsigned long dt = currentTime - _lastDataReadingTime;
+
+    if (dt < MIN_INTERVAL) {
+        return _lastRPM;
+    }
+
     int dCount = count - _lastEncoderReading;
     float rpm = (float(dCount) / dt) * 60000.0 / _countPerRev;
+
+    // Update rolling average
+    _rpmSum -= _rpmBuffer[_rpmIndex];
+    _rpmBuffer[_rpmIndex] = rpm;
+    _rpmSum += rpm;
+    _rpmIndex = (_rpmIndex + 1) % RPM_BUFFER_SIZE;
+
     _lastEncoderReading = count;
     _lastDataReadingTime = currentTime;
-    return rpm;
+    _lastRPM = _rpmSum / RPM_BUFFER_SIZE;
+    return _lastRPM;
 }
 
 float MotorDriver::_computeAngularVelocity(float rpm) {

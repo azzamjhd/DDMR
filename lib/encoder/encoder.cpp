@@ -34,3 +34,7 @@ void Encoder::count_isr(void) {
         _count++;
     }
 }
+
+void Encoder::printCount(void) const {
+    Serial.print(_count);
+}
