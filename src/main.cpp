@@ -3,8 +3,9 @@
 
 #include <PID_v1.h>
 #include <Ultrasonic.h>
-// #define TEST_DRIVER
-#define TEST_CONTROLLER
+
+#define TEST_DRIVER
+// #define TEST_CONTROLLER
 
 #define WHELL_DIAMETER 0.065
 #define COUNT_PER_REV 320
@@ -82,11 +83,11 @@ void ultrasonicRead() {
     average2 = total2 / numReadings;
     average3 = total3 / numReadings;
 
-    Serial.print(">");
-    Serial.print("S1:"); Serial.print(average1); Serial.print(",");
-    Serial.print("S2:"); Serial.print(average2); Serial.print(",");
-    Serial.print("S3:"); Serial.print(average3); Serial.print(",");
-    Serial.println();
+    // Serial.print(">");
+    // Serial.print("S1:"); Serial.print(average1); Serial.print(",");
+    // Serial.print("S2:"); Serial.print(average2); Serial.print(",");
+    // Serial.print("S3:"); Serial.print(average3); Serial.print(",");
+    // Serial.println();
 }
 
 void setup() {
@@ -98,8 +99,8 @@ void setup() {
     rightMotor.setPIDGains(pidGains);
     leftMotor.setPIDGains(pidGains);
 
-    rightMotor.setVelocity(0.3);
-    leftMotor.setVelocity(0.3);
+    rightMotor.setVelocity(0.5);
+    leftMotor.setVelocity(0.5);
 
 #elif defined(TEST_CONTROLLER)
 
@@ -108,7 +109,7 @@ void setup() {
     cmdVel.x = 1;
     cmdVel.w = 3;
 
-    // robot.setCmdVel(cmdVel);
+    robot.setCmdVel(cmdVel);
 
 #endif
 }
@@ -125,7 +126,7 @@ void loop() {
     Serial.print(">");
     Serial.print("R:"); Serial.print(rightMotorData.velocity); Serial.print(",");
     Serial.print("L:"); Serial.print(leftMotorData.velocity); Serial.print(",");
-
+    Serial.println();
 
     // rightMotor.setPWM(255);
     // leftMotor.setPWM(255);
@@ -136,7 +137,6 @@ void loop() {
     rightMotor.run();
     leftMotor.run();
 
-    Serial.println();
 #elif defined(TEST_CONTROLLER)
     ultrasonicRead();
 
@@ -162,5 +162,12 @@ void loop() {
 
     robot.run();
     // robot.printPose();
-}
+    rightMotor.getMotorData(rightMotorData);
+    leftMotor.getMotorData(leftMotorData);
+
+    Serial.print(">");
+    Serial.print("R:"); Serial.print(rightMotorData.velocity); Serial.print(",");
+    Serial.print("L:"); Serial.print(leftMotorData.velocity); Serial.print(",");
+    Serial.println();
 #endif
+}

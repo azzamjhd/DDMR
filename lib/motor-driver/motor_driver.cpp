@@ -137,6 +137,7 @@ void MotorDriver::_sendPWM() {
 void MotorDriver::run() {
     if (_motorMode == MotorMode::CLOSED_LOOP) {
         _computeMotorData();
+        _input = _motorData.velocity;
         _pid.Compute();
         setPWM(_output, MotorMode::CLOSED_LOOP);
     }

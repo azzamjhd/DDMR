@@ -61,7 +61,7 @@ class MotorDriver {
 
     double _setpoint, _input, _output;
     PIDGains _pidGains;
-    PID _pid = PID(&_input, &_output, &_setpoint, 0, 0, 0, P_ON_M, DIRECT);
+    PID _pid = PID(&_input, &_output, &_setpoint, 0, 0, 0, DIRECT);
 
     MotorDirection _motorDir;
     MotorMode _motorMode;
