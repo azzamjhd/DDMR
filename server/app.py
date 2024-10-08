@@ -8,12 +8,24 @@ import time
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# UDP settings
-UDP_IP = "0.0.0.0"  # Listen on all network interfaces
-UDP_PORT = 5005      # Port for UDP communication
-BUFFER_SIZE = 1024   # Buffer size for UDP packets
+## Serial port settings
+def find_serial_port():
+    import serial.tools.list_ports
+    while True:
+        ports = list(serial.tools.list_ports.comports())
+        for port in ports:
+            try:
+                ser = serial.Serial(port.device, 115200, timeout=1)
+                print(f"Connected to {port.device}")
+                return ser
+            except (OSError, serial.SerialException):
+                pass
+        print("No serial port found. Retrying in 5 seconds...")
+        time.sleep(5)
 
-DEST_IP = "127.0.0.1"
+ser = find_serial_port()
+
+# UDP settings
 DEST_PORT = 5005
 
 # Create a UDP socket
@@ -25,13 +37,17 @@ client_ip = None
 
 def send_udp_data():
     global streaming
-    counter = 0
     while streaming:
-        message = f"Streaming UDP data: {counter}"
-        udp_socket.sendto(message.encode(), (client_ip, DEST_PORT))
-        counter += 1
-        print(f"Sent UDP data: {message}")
-        time.sleep(0.01)
+        if ser and ser.in_waiting > 0:
+            try:
+                serial_data = ser.readline().decode('utf-8', errors="ignore").strip()
+                timestamp = time.strftime("%H:%M:%S", time.gmtime()) + f":{int(time.time() * 1000) % 1000:03d}"
+                message = f"{timestamp}: {serial_data}"
+                udp_socket.sendto(message.encode(), (client_ip, DEST_PORT))
+                print(f"Sent UDP data: {message}")
+            except Exception as e:
+                print(f"Error reading from serial port: {e}")
+        # time.sleep(0.01)
 
 
 # WebSocket (SocketIO) handler for receiving commands from Godot client
@@ -50,6 +66,31 @@ def handle_command(command):
             streaming = False
             streaming_thread.join()
             print("Stopped streaming UDP data")
+
+@socketio.on('closeLoop')
+def handle_closeLoop(data):
+    x = data['x'] * 1000
+    w = data['w'] * 1000
+    command = f"c {int(x)} {int(w)}\n"
+    ser.write(command.encode())
+    print(f"Sent command: {command}")
+
+@socketio.on('openLoop')
+def handle_openLoop(data):
+    pwmR = data['pwmR']
+    pwmL = data['pwmL']
+    command = f"o {pwmR} {pwmL}\n"
+    ser.write(command.encode())
+    print(f"Sent command: {command}")
+
+@socketio.on('pidGains')
+def handle_pidGains(data):
+    kp = data['kp']
+    ki = data['ki']
+    kd = data['kd']
+    command = f"p {kp} {ki} {kd}\n"
+    ser.write(command.encode())
+    print(f"Sent command: {command}")
 
 @socketio.on('message')
 def handle_message(message):
