@@ -1,15 +1,17 @@
 #include <config.h>
 #include <motor_driver.hpp>
+#include "serial_command.hpp"
 
 #include <PID_v1.h>
 #include <Ultrasonic.h>
 
-#define TEST_DRIVER
+// #define TEST_DRIVER
 // #define TEST_CONTROLLER
+#define TEST_CARTESIAN_CONTROL
 
 #define WHELL_DIAMETER 0.065
 #define COUNT_PER_REV 320
-double Kp = 120, Ki = 0.5, Kd = 1;
+double Kp = 20, Ki = 400, Kd = 0;
 PIDGains pidGains = {Kp, Ki, Kd};
 MotorData rightMotorData, leftMotorData;
 
@@ -23,14 +25,21 @@ Encoder leftEncoder(L_ENC_A, L_ENC_B,true);
 MotorDriver rightMotor(PWM_A, A_IN_1, A_IN_2, &rightEncoder, WHELL_DIAMETER, COUNT_PER_REV);
 MotorDriver leftMotor(PWM_B, B_IN_1, B_IN_2, &leftEncoder, WHELL_DIAMETER, COUNT_PER_REV);
 
-#ifdef TEST_CONTROLLER
-
 #include "motor_controller.hpp"
 #define DIST_BETWEEN_WHEELS 0.2
 MotorController robot(&rightMotor, &leftMotor, DIST_BETWEEN_WHEELS);
+SerialCommand serialCommand(&robot);
 CmdVel cmdVel;
 
-#endif
+// Odometry controls
+double distanceError = 0;
+double velOutput = 0;
+double Kp_pos = 1, Ki_pos = 0, Kd_pos = 0;
+PID CartesianControlPID(&distanceError, &velOutput, 0, Kp, Ki, Kd, DIRECT);
+double angleError = 0; 
+double angleCmdOutput = 0;
+double Kp_angle = 1, Ki_angle = 0, Kd_angle = 0;
+PID AngleControlPID(&angleError, &angleCmdOutput, 0, Kp, Ki, Kd, DIRECT);
 
 void rightEncoderISR() { rightEncoder.count_isr(); }
 void leftEncoderISR() { leftEncoder.count_isr(); }
@@ -79,9 +88,14 @@ void ultrasonicRead() {
     }
 
     // calculate the average:
-    average1 = total1 / numReadings;
-    average2 = total2 / numReadings;
-    average3 = total3 / numReadings;
+    // average1 = total1 / numReadings;
+    // average2 = total2 / numReadings;
+    // average3 = total3 / numReadings;
+
+    average1 = ultrasonic1.read();
+    average2 = ultrasonic2.read();
+    average3 = ultrasonic3.read();
+
 
     // Serial.print(">");
     // Serial.print("S1:"); Serial.print(average1); Serial.print(",");
@@ -90,29 +104,68 @@ void ultrasonicRead() {
     // Serial.println();
 }
 
+void autoRun() {
+    ultrasonicRead();
+
+    const int safeDistance = 20; // Safe distance in cm
+    const int followDistance = 15; // Distance to maintain from the wall in cm
+
+    if (average2 < safeDistance && average1 < safeDistance && average3 < safeDistance) {
+        // All sensors blocked, move backward and turn in place
+        robot.setCmdVel({-0.5, 5});
+    } else if (average2 < safeDistance) {
+        // Front sensor blocked, turn in place
+        robot.setCmdVel({0, 3});
+    } else if (average1 < followDistance) {
+        // Right side too close to the wall, turn left slightly
+        robot.setCmdVel({0.3, 3});
+    } else if (average3 < followDistance) {
+        // Left side too close to the wall, turn right slightly
+        robot.setCmdVel({0.3, -3});
+    } else {
+        // Move forward
+        robot.setCmdVel({0.5, 0});
+    }
+}
+
 void setup() {
-    Serial.begin(9600);
+    Serial.begin(115200);
     setupInterrupts();
+    robot.setPIDGains(pidGains);
+
+    CartesianControlPID.SetMode(AUTOMATIC);
+    CartesianControlPID.SetOutputLimits(-0.5, 0.5);
+    AngleControlPID.SetMode(AUTOMATIC);
+    AngleControlPID.SetOutputLimits(-2, 2);
 
 #ifdef TEST_DRIVER
 
     rightMotor.setPIDGains(pidGains);
     leftMotor.setPIDGains(pidGains);
 
-    rightMotor.setVelocity(0.5);
-    leftMotor.setVelocity(0.5);
-
-#elif defined(TEST_CONTROLLER)
-
-    robot.setPIDGains(pidGains);
-
-    cmdVel.x = 1;
-    cmdVel.w = 3;
-
-    robot.setCmdVel(cmdVel);
+    rightMotor.setVelocity(1);
+    leftMotor.setVelocity(1);
 
 #endif
 }
+
+bool print = true;
+Pose currentPose;
+
+void moveTo(float x_target, float y_target, Pose currentPose) {
+    distanceError = sqrt(pow(x_target - currentPose.x, 2) + pow(y_target - currentPose.y, 2));
+    angleError = atan2(y_target - currentPose.y, x_target - currentPose.x) - currentPose.theta;
+
+    while (angleError > PI) angleError -= 2*PI;
+    while (angleError < -PI) angleError += 2*PI;
+
+    CartesianControlPID.Compute();
+    AngleControlPID.Compute();
+
+    robot.setCmdVel({float(velOutput), float(angleCmdOutput)});
+}
+
+// ====================== MAIN LOOP ======================
 
 void loop() {
 #ifdef TEST_DRIVER
@@ -138,36 +191,42 @@ void loop() {
     leftMotor.run();
 
 #elif defined(TEST_CONTROLLER)
-    ultrasonicRead();
-
-    const int safeDistance = 20; // Safe distance in cm
-    const int followDistance = 15; // Distance to maintain from the wall in cm
-
-    if (average2 < safeDistance && average1 < safeDistance && average3 < safeDistance) {
-        // All sensors blocked, move backward and turn in place
-        robot.setCmdVel({-0.5, 3});
-    } else if (average2 < safeDistance) {
-        // Front sensor blocked, turn in place
-        robot.setCmdVel({0, 3});
-    } else if (average1 < followDistance) {
-        // Right side too close to the wall, turn left slightly
-        robot.setCmdVel({0.5, 1});
-    } else if (average3 < followDistance) {
-        // Left side too close to the wall, turn right slightly
-        robot.setCmdVel({0.5, -1});
-    } else {
-        // Move forward
-        robot.setCmdVel({1, 0});
-    }
+    // autoRun();
 
     robot.run();
-    // robot.printPose();
+    // serialCommand.readSerial();
+    robot.printPose();
     rightMotor.getMotorData(rightMotorData);
     leftMotor.getMotorData(leftMotorData);
 
-    Serial.print(">");
-    Serial.print("R:"); Serial.print(rightMotorData.velocity); Serial.print(",");
-    Serial.print("L:"); Serial.print(leftMotorData.velocity); Serial.print(",");
-    Serial.println();
+    if (Serial.available()) {
+        String input = Serial.readStringUntil('\n'); // Read the input until newline character
+        Serial.print("Input: "); Serial.println(input); // Print the inputted data back
+
+        if (input.length() > 0) {
+
+            int x, w;
+            if (sscanf(input.c_str(), "c %d %d", &x, &w) == 2) {
+                cmdVel.x = float(x)/1000.0;
+                cmdVel.w = float(w)/1000.0;
+                robot.setCmdVel(cmdVel);
+                // Serial.print("Set cmdVel to x: "); Serial.print(x); Serial.print(", w: "); Serial.println(w);
+            } else {
+                Serial.println("Invalid input format. Please enter two integers separated by a space.");
+            }
+        }
+    }
+
+    // Serial.print(">");
+    // Serial.print("R:"); Serial.print(rightMotorData.velocity); Serial.print(",");
+    // Serial.print("L:"); Serial.print(leftMotorData.velocity); Serial.print(",");
+    // Serial.println();
+
+#elif defined(TEST_CARTESIAN_CONTROL)
+    robot.run();
+    robot.getPose(currentPose);
+    moveTo(1, 1, currentPose);
+
+    robot.printPose();
 #endif
 }

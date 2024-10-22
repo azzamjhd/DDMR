@@ -78,8 +78,8 @@ void MotorController::_computeWheelSpeeds() {
     v_r = v_r * VELOCITY_SCALING_FACTOR;
     v_l = v_l * VELOCITY_SCALING_FACTOR;
 
-    Serial.print("v_r: "); Serial.print(v_r); Serial.print("\t");
-    Serial.print("v_l: "); Serial.println(v_l);
+    // Serial.print("v_r: "); Serial.print(v_r); Serial.print("\t");
+    // Serial.print("v_l: "); Serial.println(v_l);
 
     _rightMotor->setVelocity(v_r);
     _leftMotor->setVelocity(v_l);

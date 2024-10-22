@@ -49,7 +49,7 @@ class MotorDriver {
     bool _reverse;
     float _MAX_VELOCITY = 1.0; // m/s
 
-    static const int RPM_BUFFER_SIZE = 5;
+    static const int RPM_BUFFER_SIZE = 10;
     float _rpmBuffer[RPM_BUFFER_SIZE];
     int _rpmIndex = 0;
     float _rpmSum = 0;
