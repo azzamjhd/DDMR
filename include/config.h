@@ -32,11 +32,6 @@
  * inA = attached to Right motor, inB = attached to Left motor
 ****************************************************************/
 
-// Motor direction
-#define _FORWARD 0b01
-#define _BACKWARD 0b10
-#define _STOP 0b00
-
 // Right Motor Encoder A pin
 #define R_ENC_A 3
 // Right Motor Encoder B pin
