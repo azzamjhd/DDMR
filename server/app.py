@@ -15,6 +15,16 @@ ser = None
 stop_flag = threading.Event()  # Flag to stop the serial port monitoring thread
 connected_clients = 0  # Track the number of connected clients
 
+# UDP settings
+DEST_PORT = 5005
+
+# Create a UDP socket
+udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+streaming = False
+streaming_thread = None
+client_ip = None
+
 def find_serial_port():
     global ser
     while not stop_flag.is_set():
@@ -32,6 +42,20 @@ def find_serial_port():
         time.sleep(5)
     return False  # Indicate failure to connect
 
+def start_streaming():
+    global streaming, streaming_thread
+    if ser and not streaming:
+        streaming = True
+        streaming_thread = threading.Thread(target=send_udp_data)
+        streaming_thread.start()
+        print("Started streaming UDP data")
+
+def stop_streaming():
+    global streaming
+    if streaming:
+        streaming = False  # Just set streaming to False, the thread will stop automatically
+        print("Stopped streaming UDP data")
+
 # Start searching for serial port in a separate thread
 def monitor_serial_port():
     global streaming, ser
@@ -48,16 +72,6 @@ def monitor_serial_port():
 # Start monitoring the serial port in a separate thread
 serial_monitor_thread = threading.Thread(target=monitor_serial_port)
 serial_monitor_thread.start()
-
-# UDP settings
-DEST_PORT = 5005
-
-# Create a UDP socket
-udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-streaming = False
-streaming_thread = None
-client_ip = None
 
 def send_udp_data():
     global streaming, ser
@@ -85,20 +99,6 @@ def send_udp_data():
             except Exception as e:
                 print(f"Error reading from serial port: {e}")
         time.sleep(0.01)
-
-def start_streaming():
-    global streaming, streaming_thread
-    if ser and not streaming:
-        streaming = True
-        streaming_thread = threading.Thread(target=send_udp_data)
-        streaming_thread.start()
-        print("Started streaming UDP data")
-
-def stop_streaming():
-    global streaming
-    if streaming:
-        streaming = False  # Just set streaming to False, the thread will stop automatically
-        print("Stopped streaming UDP data")
 
 # WebSocket (SocketIO) handler for receiving commands from Godot client
 @socketio.on('command')

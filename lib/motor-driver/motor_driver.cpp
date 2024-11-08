@@ -145,6 +145,17 @@ void MotorDriver::run() {
     _sendPWM();
 }
 
+void MotorDriver::calibrate() {
+    if (_motorMode == MotorMode::CLOSED_LOOP) {
+        _computeMotorData();
+        _input = _motorData.velocity;
+        _pid.Compute();
+        // setPWM(_output, MotorMode::CLOSED_LOOP);
+    }
+    // Serial.print("SP:");Serial.print(_setpoint);Serial.print(",");
+    // _sendPWM();
+}
+
 void MotorDriver::printStatus() {
     // Serial.print("w: ");
     Serial.print(_motorData.angularVelocity); Serial.print("\t");

@@ -21,6 +21,8 @@ void MotorController::setCmdVel(CmdVel cmdVel) {
     _computeWheelSpeeds();
 }
 
+void MotorController::getCmdVel(CmdVel &cmdVel) const { cmdVel = _cmdVel; }
+
 void MotorController::getPose(Pose &pose) const { pose = _pose; }
 
 void MotorController::reset() {
@@ -36,6 +38,12 @@ void MotorController::run() {
         _computePose();
         _rightMotor->run();
         _leftMotor->run();
+}
+
+void MotorController::calibrate() {
+    _computePose();
+    _rightMotor->calibrate();
+    _leftMotor->calibrate();
 }
 
 void MotorController::moveForward() {
@@ -98,8 +106,9 @@ void MotorController::_computePose() {
     _pose.x += d_c * cos(_pose.theta);
     _pose.y += d_c * sin(_pose.theta);
     _pose.theta += d_theta;
-    if (_pose.theta > PI) _pose.theta -= 2 * PI;
-    if (_pose.theta < -PI) _pose.theta += 2 * PI;
+    _pose.theta = atan2(sin(_pose.theta), cos(_pose.theta));
+    // if (_pose.theta > PI) _pose.theta -= 2 * PI;
+    // if (_pose.theta < -PI) _pose.theta += 2 * PI;
 
     _prev_right_dist = rightMotorData.distance;
     _prev_left_dist = leftMotorData.distance;
@@ -111,7 +120,7 @@ void MotorController::printPose() const {
     Serial.print(", ");
     Serial.print(_pose.y);
     Serial.print(", ");
-    Serial.println(_pose.theta);
+    Serial.println(_pose.theta * 180 / PI);
 }
 
 void MotorController::moveOpenLoop(int leftPWM, int rightPWM) {

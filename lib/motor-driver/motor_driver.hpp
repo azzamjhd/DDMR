@@ -92,6 +92,7 @@ class MotorDriver {
      */
     MotorDriver(uint8_t pinEn, uint8_t pinIn1, uint8_t pinIn2, Encoder *encoder, float wheelRadius, int countPerRev, bool reverse = false);
 
+    void calibrate(void);
     /// @brief Run the motor driver
     void run(void);
     /// @brief Print the status of the motor driver

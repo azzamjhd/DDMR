@@ -11,6 +11,8 @@
 
 #define WHELL_DIAMETER 0.065
 #define COUNT_PER_REV 320
+#define DIST_BETWEEN_WHEELS 0.18
+
 double Kp = 20, Ki = 400, Kd = 0;
 PIDGains pidGains = {Kp, Ki, Kd};
 MotorData rightMotorData, leftMotorData;
@@ -22,11 +24,10 @@ Ultrasonic ultrasonic3(TRIG_PIN_3, ECHO_PIN_3);
 Encoder rightEncoder(R_ENC_A, R_ENC_B);
 Encoder leftEncoder(L_ENC_A, L_ENC_B,true);
 
-MotorDriver rightMotor(PWM_A, A_IN_1, A_IN_2, &rightEncoder, WHELL_DIAMETER, COUNT_PER_REV);
-MotorDriver leftMotor(PWM_B, B_IN_1, B_IN_2, &leftEncoder, WHELL_DIAMETER, COUNT_PER_REV);
+MotorDriver rightMotor(PWM_A, A_IN_1, A_IN_2, &rightEncoder, WHELL_DIAMETER/2, COUNT_PER_REV);
+MotorDriver leftMotor(PWM_B, B_IN_1, B_IN_2, &leftEncoder, WHELL_DIAMETER/2, COUNT_PER_REV);
 
 #include "motor_controller.hpp"
-#define DIST_BETWEEN_WHEELS 0.2
 MotorController robot(&rightMotor, &leftMotor, DIST_BETWEEN_WHEELS);
 SerialCommand serialCommand(&robot);
 CmdVel cmdVel;
@@ -34,12 +35,13 @@ CmdVel cmdVel;
 // Odometry controls
 double distanceError = 0;
 double velOutput = 0;
-double Kp_pos = 1, Ki_pos = 0, Kd_pos = 0;
-PID CartesianControlPID(&distanceError, &velOutput, 0, Kp, Ki, Kd, DIRECT);
-double angleError = 0; 
+double Kp_pos = 1.5, Ki_pos = 0.01, Kd_pos = 0.5;
+PID CartesianControlPID(&distanceError, &velOutput, 0, Kp_pos, Ki_pos, Kd_pos, DIRECT);
+double angleInput = 0; 
 double angleCmdOutput = 0;
-double Kp_angle = 1, Ki_angle = 0, Kd_angle = 0;
-PID AngleControlPID(&angleError, &angleCmdOutput, 0, Kp, Ki, Kd, DIRECT);
+double angleSetpoint = 0;
+double Kp_angle = 2, Ki_angle = 0, Kd_angle = 0.5;
+PID AngleControlPID(&angleInput, &angleCmdOutput, &angleSetpoint, Kp_angle, Ki_angle, Kd_angle, DIRECT);
 
 void rightEncoderISR() { rightEncoder.count_isr(); }
 void leftEncoderISR() { leftEncoder.count_isr(); }
@@ -49,137 +51,150 @@ void setupInterrupts(void) {
     attachInterrupt(digitalPinToInterrupt(L_ENC_A), leftEncoderISR, RISING);
 }
 
-const int numReadings = 5;
-static int readings1[numReadings];      // the readings from the ultrasonic sensor 1
-static int readings2[numReadings];      // the readings from the ultrasonic sensor 2
-static int readings3[numReadings];      // the readings from the ultrasonic sensor 3
-static int readIndex = 0;               // the index of the current reading
-static int total1 = 0;                  // the running total of sensor 1
-static int total2 = 0;                  // the running total of sensor 2
-static int total3 = 0;                  // the running total of sensor 3
-static int average1 = 0;                // the average of sensor 1
-static int average2 = 0;                // the average of sensor 2
-static int average3 = 0;                // the average of sensor 3
-
-void ultrasonicRead() {
-
-    // subtract the last reading:
-    total1 = total1 - readings1[readIndex];
-    total2 = total2 - readings2[readIndex];
-    total3 = total3 - readings3[readIndex];
-
-    // read from the sensor:
-    readings1[readIndex] = ultrasonic1.read();
-    readings2[readIndex] = ultrasonic2.read();
-    readings3[readIndex] = ultrasonic3.read();
-
-    // add the reading to the total:
-    total1 = total1 + readings1[readIndex];
-    total2 = total2 + readings2[readIndex];
-    total3 = total3 + readings3[readIndex];
-
-    // advance to the next position in the array:
-    readIndex = readIndex + 1;
-
-    // if we're at the end of the array...
-    if (readIndex >= numReadings) {
-        // ...wrap around to the beginning:
-        readIndex = 0;
-    }
-
-    // calculate the average:
-    // average1 = total1 / numReadings;
-    // average2 = total2 / numReadings;
-    // average3 = total3 / numReadings;
-
-    average1 = ultrasonic1.read();
-    average2 = ultrasonic2.read();
-    average3 = ultrasonic3.read();
-
-
-    // Serial.print(">");
-    // Serial.print("S1:"); Serial.print(average1); Serial.print(",");
-    // Serial.print("S2:"); Serial.print(average2); Serial.print(",");
-    // Serial.print("S3:"); Serial.print(average3); Serial.print(",");
-    // Serial.println();
-}
-
-void autoRun() {
-    ultrasonicRead();
-
-    const int safeDistance = 20; // Safe distance in cm
-    const int followDistance = 15; // Distance to maintain from the wall in cm
-
-    if (average2 < safeDistance && average1 < safeDistance && average3 < safeDistance) {
-        // All sensors blocked, move backward and turn in place
-        robot.setCmdVel({-0.5, 5});
-    } else if (average2 < safeDistance) {
-        // Front sensor blocked, turn in place
-        robot.setCmdVel({0, 3});
-    } else if (average1 < followDistance) {
-        // Right side too close to the wall, turn left slightly
-        robot.setCmdVel({0.3, 3});
-    } else if (average3 < followDistance) {
-        // Left side too close to the wall, turn right slightly
-        robot.setCmdVel({0.3, -3});
-    } else {
-        // Move forward
-        robot.setCmdVel({0.5, 0});
-    }
-}
-
 void setup() {
     Serial.begin(115200);
     setupInterrupts();
     robot.setPIDGains(pidGains);
 
     CartesianControlPID.SetMode(AUTOMATIC);
-    CartesianControlPID.SetOutputLimits(-0.5, 0.5);
+    CartesianControlPID.SetOutputLimits(-0.3, 0.3);
     AngleControlPID.SetMode(AUTOMATIC);
-    AngleControlPID.SetOutputLimits(-2, 2);
-
-#ifdef TEST_DRIVER
-
-    rightMotor.setPIDGains(pidGains);
-    leftMotor.setPIDGains(pidGains);
-
-    rightMotor.setVelocity(1);
-    leftMotor.setVelocity(1);
-
-#endif
+    AngleControlPID.SetOutputLimits(-3, 3);
 }
 
 bool print = true;
 Pose currentPose;
 
 void moveTo(float x_target, float y_target, Pose currentPose) {
+    CmdVel currentCmdVel;
     distanceError = sqrt(pow(x_target - currentPose.x, 2) + pow(y_target - currentPose.y, 2));
-    angleError = atan2(y_target - currentPose.y, x_target - currentPose.x) - currentPose.theta;
+    angleSetpoint = atan2(y_target - currentPose.y, x_target - currentPose.x);
+    while (angleSetpoint > PI) angleSetpoint -= 2*PI;
+    while (angleSetpoint < -PI) angleSetpoint += 2*PI;
+    angleSetpoint = angleSetpoint * 180.0 / PI;
 
-    while (angleError > PI) angleError -= 2*PI;
-    while (angleError < -PI) angleError += 2*PI;
+    angleInput = currentPose.theta * 180.0 / PI;
 
-    CartesianControlPID.Compute();
+    if (fabs(angleSetpoint-angleInput) > 5) {
+        AngleControlPID.Compute();
+
+        currentCmdVel.w = angleCmdOutput;
+        currentCmdVel.x = 0;
+        robot.setCmdVel(currentCmdVel);
+    } else {
+        CartesianControlPID.Compute();
+        currentCmdVel.x = -velOutput;
+        currentCmdVel.w = 0;
+        // v = velOutput;
+        robot.setCmdVel(currentCmdVel);
+    }
+    // robot.setCmdVel(currentCmdVel);
+
+    Serial.print("ERR: "); 
+    Serial.print(distanceError); Serial.print("\t");
+    Serial.print(angleSetpoint); Serial.print("\t");
+    Serial.print("CMD: ");
+    Serial.print(currentCmdVel.x); Serial.print("\t");
+    Serial.print(currentCmdVel.w); Serial.print("\t");
+
+}
+
+float MAX_LINEAR_VELOCITY = 0.5;
+float MAX_ANGULAR_VELOCITY = 3.0;
+
+float usePID(float setpoint) {
+    angleSetpoint = setpoint;
+    angleInput = currentPose.theta;
     AngleControlPID.Compute();
+    return angleCmdOutput;
+}
 
-    robot.setCmdVel({float(velOutput), float(angleCmdOutput)});
+void goToGoal(Pose currentPose, float x_target, float y_target, float theta_target = NAN) {
+    CmdVel currentCmdVel;
+
+    bool use_beta = false;
+    float k_rho = 0.5;
+    float k_alpha = 2.0;
+    float k_beta = 1.0;
+    // double k_p(2.0), k_i(0.01), k_d(0.1);
+    float goal_tolerance = 0.1;
+
+    float alpha, beta;
+
+    float dx = x_target - currentPose.x;
+    float dy = y_target - currentPose.y;
+    float rho = sqrt(dx*dx + dy*dy);
+    alpha = atan2(dy, dx) - currentPose.theta;
+    alpha = atan2(sin(alpha), cos(alpha));
+
+    Serial.print(alpha); Serial.print("\t");
+
+    if (theta_target != NAN) {
+        beta = theta_target - currentPose.theta;
+        beta = atan2(sin(beta), cos(beta));
+        use_beta = true;
+    } else {
+        beta = 0;
+        use_beta = false;
+    }
+
+    enum State { MOVE_TO_GOAL, ADJUST_ANGLE };
+    static State state = MOVE_TO_GOAL;
+
+    if (rho <= goal_tolerance) {
+        state = ADJUST_ANGLE;
+    }
+
+    switch (state) {
+        case MOVE_TO_GOAL:
+            currentCmdVel.x = k_rho * rho;
+            currentCmdVel.w = k_alpha * alpha;
+            break;
+        case ADJUST_ANGLE:
+            if (use_beta) {
+                // currentCmdVel.w = usePID(theta_target);
+                currentCmdVel.x = 0;
+                currentCmdVel.w = k_beta * beta;
+            } else {
+                currentCmdVel.x = 0;
+                currentCmdVel.w = 0;
+            }
+            break;
+    }
+
+    // AngleControlPID.Compute();
+    currentCmdVel.x = constrain(currentCmdVel.x, -MAX_LINEAR_VELOCITY, MAX_LINEAR_VELOCITY);
+    // currentCmdVel.w = angleCmdOutput;
+    currentCmdVel.w = constrain(currentCmdVel.w, -MAX_ANGULAR_VELOCITY, MAX_ANGULAR_VELOCITY);
+
+    robot.setCmdVel(currentCmdVel);
 }
 
 // ====================== MAIN LOOP ======================
 
 void loop() {
 #ifdef TEST_DRIVER
-    // rightMotor.printStatus(); Serial.print("\t");
-    // leftMotor.printStatus(); Serial.print("\t");
-    // rightEncoder.printCount(); Serial.print("\t");
-    // leftEncoder.printCount(); Serial.println();
+    robot.calibrate();
+
     rightMotor.getMotorData(rightMotorData);
     leftMotor.getMotorData(leftMotorData);
 
-    Serial.print(">");
-    Serial.print("R:"); Serial.print(rightMotorData.velocity); Serial.print(",");
-    Serial.print("L:"); Serial.print(leftMotorData.velocity); Serial.print(",");
-    Serial.println();
+    // Calibrate how many counts per meter
+
+    Serial.print("Enc: ");
+    rightEncoder.printCount(); Serial.print(", ");
+    leftEncoder.printCount(); Serial.print("\t");
+
+    Serial.print("Dist: ");
+    Serial.print(rightMotorData.distance); Serial.print(", ");
+    Serial.print(leftMotorData.distance); Serial.print("\t");
+
+    robot.printPose();
+
+    // Serial.print(">");
+    // Serial.print("R:"); Serial.print(rightMotorData.velocity); Serial.print(",");
+    // Serial.print("L:"); Serial.print(leftMotorData.velocity); Serial.print(",");
+    // Serial.println();
 
     // rightMotor.setPWM(255);
     // leftMotor.setPWM(255);
@@ -187,8 +202,8 @@ void loop() {
     // rightMotor.setVelocity(1);
     // leftMotor.setVelocity(1);
 
-    rightMotor.run();
-    leftMotor.run();
+    // rightMotor.run();
+    // leftMotor.run();
 
 #elif defined(TEST_CONTROLLER)
     // autoRun();
@@ -223,10 +238,11 @@ void loop() {
     // Serial.println();
 
 #elif defined(TEST_CARTESIAN_CONTROL)
-    robot.run();
     robot.getPose(currentPose);
-    moveTo(1, 1, currentPose);
+    // moveTo(1, 1, currentPose);
+    goToGoal(currentPose, 1, 1);
 
+    robot.run();
     robot.printPose();
 #endif
 }

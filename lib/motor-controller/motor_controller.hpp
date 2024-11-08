@@ -49,10 +49,17 @@ class MotorController {
          */
         void getPose(Pose &pose) const;
         /**
+         * @brief print the pose of the robot without the motor running
+         */
+        void calibrate();
+        /**
          * @brief Set the Cmd Vel object
          * @param cmdVel Cmd Vel object = {x, w}. x is the linear velocity in m/s and w is the angular velocity in rad/s
          */
         void setCmdVel(CmdVel cmdVel);
+        /// @brief Get current cmd_vel
+        /// @param cmdVel 
+        void getCmdVel(CmdVel &cmdVel) const;
         /// @brief Reset the motor controller
         void reset();
         /// @brief Run the motor controller
