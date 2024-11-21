@@ -1,0 +1,132 @@
+#include <Arduino.h>
+
+#ifdef DEBUG
+#define DEBUG_PRINT(x) Serial.print(x)
+#define DEBUG_PRINTLN(x) Serial.println(x)
+#define DEBUG_BEGIN(baud) Serial.begin(baud)
+#else
+#define DEBUG_PRINT(x)
+#define DEBUG_PRINTLN(x)
+#define DEBUG_BEGIN(baud)
+#endif
+
+uint8_t calculateChecksum(const uint8_t* buffer, size_t length) {
+  uint8_t checksum = 0;
+  for (size_t i = 0; i < length; i++) {
+    checksum ^= buffer[i];
+  }
+  return checksum;
+}
+
+template <typename T>
+void sendStructData(const T& data, DataType type) {
+  const uint8_t* dataptr = reinterpret_cast<const uint8_t*>(&data);
+  // Start byte
+  Serial.write(0xAA);
+  // Send Data
+  Serial.write(type);
+  Serial.write(dataptr, sizeof(T));
+  // Checksum
+  uint8_t checksum = calculateChecksum(dataptr, sizeof(T));
+  Serial.write(checksum);
+  // End byte
+  Serial.write(0x55);
+}
+
+void sendPidGains() {
+  PIDGains pidGains = robot.getPIDGains();
+  sendStructData(pidGains, DataType::PID_GAINS);
+}
+
+void sendStatus() {
+  robotData.pose = currentPose;
+  robotData.ultrasonic[0] = 8;
+  robotData.ultrasonic[1] = 9;
+  robotData.ultrasonic[2] = 10;
+  robotData.speed[0] = leftMotorData.velocity;
+  robotData.speed[1] = rightMotorData.velocity;
+
+  // sendStructData(robotData, DataType::ROBOT_STATUS);
+  sendString();
+}
+
+void sendString() {
+  rightEncoder.printCount();
+  Serial.print("\t");
+  leftEncoder.printCount();
+  Serial.print("\t");
+  Serial.print(robotData.pose.x);
+  Serial.print("\t");
+  Serial.print(robotData.pose.y);
+  Serial.print("\t");
+  Serial.print(robotData.pose.theta);
+  Serial.print("\t");
+  Serial.print(robotData.speed[0]);
+  Serial.print("\t");
+  Serial.print(robotData.speed[1]);
+  Serial.print("\t");
+  Serial.println();
+}
+
+void SerialScan() {
+  if (Serial.available()) {
+    // Read the input until newline character
+    String input = Serial.readStringUntil('\n');
+    // Serial.print("Input: ");
+    // Serial.println(input);  // Print the inputted data back
+
+    if (input.length() > 0) {
+      int x, w;
+      int Kp_f, Ki_f, Kd_f;
+      int x_f, y_f, theta_f;
+
+      if (sscanf(input.c_str(), "c %d %d", &x, &w) == 2) {
+        cmdVel.x = float(x) / 1000.0;
+        cmdVel.w = float(w) / 1000.0;
+        robot.setCmdVel(cmdVel);
+
+        DEBUG_PRINT("CMD to: ");
+        DEBUG_PRINT(cmdVel.x);
+        DEBUG_PRINT("\t");
+        DEBUG_PRINTLN(cmdVel.w);
+
+        AUTOMODE = false;
+
+      } else if (sscanf(input.c_str(), "p %d %d %d", &Kp_f, &Ki_f, &Kd_f) ==
+                 3) {
+        pidGains.Kp = float(Kp_f) / 1000.0;
+        pidGains.Ki = float(Ki_f) / 1000.0;
+        pidGains.Kd = float(Kd_f) / 1000.0;
+        robot.setPIDGains(pidGains);
+
+      } else if (sscanf(input.c_str(), "t %d %d", &x_f, &y_f) == 2) {
+        goalPose.x = float(x_f) / 1000.0;
+        goalPose.y = float(y_f) / 1000.0;
+        goalPose.theta = NAN;
+        AUTOMODE = true;
+
+        DEBUG_PRINT("Goal Pose: ");
+        DEBUG_PRINT(goalPose.x);
+        DEBUG_PRINT("\t");
+        DEBUG_PRINTLN(goalPose.y);
+
+        // state = MOVE_TO_GOAL;
+      } else if (input == "g") {
+        sendPidGains();
+
+      } else if (input == "s") {
+        sendStatus();
+
+      } else if (input == "r") {
+        DEBUG_PRINTLN("Resetting robot");
+        AUTOMODE = false;
+        robot.reset();
+        currentPose = {0};
+      } else {
+        Serial.println(
+            "Invalid input format. Please enter two integers separated by a "
+            "space.");
+      }
+    }
+  }
+}

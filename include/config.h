@@ -8,7 +8,7 @@
 /************************************
  * MPU6050
  * INT - GND - SDA - SCL - GND - VCC
-*************************************/
+ *************************************/
 
 // Interrupt pin
 #define INT 19
@@ -19,7 +19,7 @@
 
 /************************************
  * Ultrasonic Sensor HC-SR04
-*************************************/
+ *************************************/
 #define ECHO_PIN_1 34
 #define TRIG_PIN_1 36
 #define ECHO_PIN_2 38
@@ -30,7 +30,7 @@
 /****************************************************************
  * DC Motor with TB6612FNG Driver
  * inA = attached to Right motor, inB = attached to Left motor
-****************************************************************/
+ ****************************************************************/
 
 // Right Motor Encoder A pin
 #define R_ENC_A 3
@@ -54,5 +54,4 @@
 // Left motor PWM pin
 #define PWM_B 6
 
-
-#endif // DEFINE_BASE_H
+#endif  // DEFINE_BASE_H
