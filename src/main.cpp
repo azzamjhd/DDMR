@@ -94,6 +94,14 @@ PID headingPID(&I_head,
                Kd_angle,
                DIRECT);
 
+uint8_t calculateChecksum(const uint8_t* buffer, size_t length);
+template <typename T>
+void sendStructData(const T& data, DataType type);
+void sendString();
+void sendPidGains();
+void sendStatus();
+void SerialScan();
+
 void rightEncoderISR() {
   rightEncoder.count_isr();
 }
@@ -201,16 +209,16 @@ void loop() {
   leftMotor.getMotorData(leftMotorData);
   robot.getPose(currentPose);
 
-  robot.SerialScan();
+  SerialScan();
 
   if (AUTOMODE) {
+    goToGoal(currentPose, goalPose);
   }
-  goToGoal(currentPose, {1.0, 0, NAN});
 
   unsigned long currentTime = millis();
   if (currentTime - lastTime >= 50) {
     lastTime = currentTime;
-    robot.sendStatus();
+    sendStatus();
   }
 
   robot.run();
@@ -219,6 +227,113 @@ void loop() {
 }
 
 // ============== FUNCTION DEFINITIONS ==============
+
+uint8_t calculateChecksum(const uint8_t* buffer, size_t length) {
+  uint8_t checksum = 0;
+  for (size_t i = 0; i < length; i++) {
+    checksum ^= buffer[i];
+  }
+  return checksum;
+}
+
+template <typename T>
+void sendStructData(const T& data, DataType type) {
+  const uint8_t* dataptr = reinterpret_cast<const uint8_t*>(&data);
+  // Start byte
+  Serial.write(0xAA);
+  // Send Data
+  Serial.write(type);
+  Serial.write(dataptr, sizeof(T));
+  // Checksum
+  uint8_t checksum = calculateChecksum(dataptr, sizeof(T));
+  Serial.write(checksum);
+  // End byte
+  Serial.write(0x55);
+}
+
+void sendString() {
+  Serial.print("Pose: ");
+  Serial.print(robotData.pose.x);
+  Serial.print(", ");
+  Serial.print(robotData.pose.y);
+  Serial.print(", ");
+  Serial.print(robotData.pose.theta);
+  Serial.print("\tUltrasonic: ");
+  Serial.print(robotData.ultrasonic[0]);
+  Serial.print(", ");
+  Serial.print(robotData.ultrasonic[1]);
+  Serial.print(", ");
+  Serial.print(robotData.ultrasonic[2]);
+  Serial.print("\tSpeed: ");
+  Serial.print(robotData.speed[0]);
+  Serial.print(", ");
+  Serial.println(robotData.speed[1]);
+}
+
+void sendPidGains() {
+  PIDGains pidGains = robot.getPIDGains();
+  sendStructData(pidGains, DataType::PID_GAINS);
+}
+
+void sendStatus() {
+  robotData.pose = currentPose;
+  robotData.ultrasonic[0] = robot.getLeftDistance();
+  robotData.ultrasonic[1] = robot.getFrontDistance();
+  robotData.ultrasonic[2] = robot.getRightDistance();
+  robotData.speed[0] = leftMotorData.velocity;
+  robotData.speed[1] = rightMotorData.velocity;
+
+  // sendStructData(robotData, DataType::ROBOT_STATUS);
+  sendString();
+}
+
+void SerialScan() {
+  if (Serial.available()) {
+    String input = Serial.readStringUntil('\n');
+    if (input.length() > 0) {
+      int x, w;
+      int Kp_f, Ki_f, Kd_f;
+      int x_f, y_f, theta_f;
+
+      if (sscanf(input.c_str(), "c %d %d", &x, &w) == 2) {
+        cmdVel.x = float(x) / 1000.0;
+        cmdVel.w = float(w) / 1000.0;
+        robot.setCmdVel(cmdVel);
+        AUTOMODE = false;
+
+      } else if (sscanf(input.c_str(), "p %d %d %d", &Kp_f, &Ki_f, &Kd_f) ==
+                 3) {
+        pidGains.Kp = float(Kp_f) / 1000.0;
+        pidGains.Ki = float(Ki_f) / 1000.0;
+        pidGains.Kd = float(Kd_f) / 1000.0;
+        robot.setPIDGains(pidGains);
+
+      } else if (sscanf(input.c_str(), "t %d %d", &x_f, &y_f) == 2) {
+        goalPose.x = float(x_f) / 1000.0;
+        goalPose.y = float(y_f) / 1000.0;
+        goalPose.theta = NAN;
+        AUTOMODE = true;
+
+        // state = MOVE_TO_GOAL;
+      } else if (input == "g") {
+        sendPidGains();
+
+      } else if (input == "s") {
+        sendStatus();
+
+      } else if (input == "r") {
+        AUTOMODE = false;
+        robot.reset();
+        currentPose = {0};
+        goalPose = {0, 0, NAN};
+      } else {
+        Serial.println(
+            "Invalid input format. Please enter two integers separated by a "
+            "space.");
+      }
+    }
+  }
+}
 
 void followWall() {
   int front_distance = robot.getFrontDistance();

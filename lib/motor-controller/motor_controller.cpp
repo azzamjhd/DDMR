@@ -34,6 +34,8 @@ void MotorController::reset() {
   _leftMotor->reset();
   _pose = {0, 0, 0};
   _cmdVel = {0, 0};
+  _prev_left_dist = 0;
+  _prev_right_dist = 0;
 }
 
 void MotorController::run() {
