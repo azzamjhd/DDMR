@@ -215,8 +215,8 @@ void MotorController::sendStatus() {
   robotData.speed[0] = leftMotorData.velocity;
   robotData.speed[1] = rightMotorData.velocity;
 
-  // sendStructData(robotData, DataType::ROBOT_STATUS);
-  printStructData(robotData);
+  sendStructData(robotData, DataType::ROBOT_STATUS);
+  // printStructData(robotData);
 }
 
 void MotorController::SerialScan() {

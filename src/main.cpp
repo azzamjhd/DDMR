@@ -9,10 +9,6 @@
 
 #define DEBUG
 
-// #define TEST_DRIVER
-// #define TEST_CONTROLLER
-#define TEST_CARTESIAN_CONTROL
-
 #define USE_OBSTACLE_AVOIDANCE
 
 #define WHELL_DIAMETER 0.065
@@ -56,7 +52,7 @@ bool AUTOMODE = false;
 
 // Odometry controls
 float MAX_LINEAR_VELOCITY = 0.1;
-float MAX_ANGULAR_VELOCITY = 0.5;
+float MAX_ANGULAR_VELOCITY = 0.4;
 int WALL_FOLLOW_DISTANCE = 10;
 int DISTANCE_THRESHOLD = 20;
 
@@ -152,55 +148,6 @@ void goToGoal(Pose currentPose, Pose goalPose);
 static unsigned long lastTime = 0;
 
 void loop() {
-#ifdef TEST_DRIVER
-  robot.calibrate();
-
-  rightMotor.getMotorData(rightMotorData);
-  leftMotor.getMotorData(leftMotorData);
-
-  int front_distance = ultrasonic1.read();
-  int left_distance = ultrasonic2.read();
-  int right_distance = ultrasonic3.read();
-
-  Serial.print(front_distance);
-  Serial.print("\t");
-  Serial.print(left_distance);
-  Serial.print("\t");
-  Serial.print(right_distance);
-  Serial.println();
-
-#elif defined(TEST_CONTROLLER)
-  // autoRun();
-
-  robot.run();
-  // serialCommand.readSerial();
-  robot.printPose();
-  rightMotor.getMotorData(rightMotorData);
-  leftMotor.getMotorData(leftMotorData);
-
-  if (Serial.available()) {
-    String input =
-        Serial.readStringUntil('\n');  // Read the input until newline character
-    Serial.print("Input: ");
-    Serial.println(input);  // Print the inputted data back
-
-    if (input.length() > 0) {
-      int x, w;
-      if (sscanf(input.c_str(), "c %d %d", &x, &w) == 2) {
-        cmdVel.x = float(x) / 1000.0;
-        cmdVel.w = float(w) / 1000.0;
-        robot.setCmdVel(cmdVel);
-        // Serial.print("Set cmdVel to x: "); Serial.print(x); Serial.print(",
-        // w: "); Serial.println(w);
-      } else {
-        Serial.println(
-            "Invalid input format. Please enter two integers separated by a "
-            "space.");
-      }
-    }
-  }
-
-#elif defined(TEST_CARTESIAN_CONTROL)
   robot.setFrontDistance(ultrasonic2.read());
   robot.setLeftDistance(ultrasonic3.read());
   robot.setRightDistance(ultrasonic1.read());
@@ -214,6 +161,7 @@ void loop() {
   if (AUTOMODE) {
     goToGoal(currentPose, goalPose);
   }
+  // goToGoal(currentPose, {1, 0, NAN});
 
   unsigned long currentTime = millis();
   if (currentTime - lastTime >= 50) {
@@ -223,7 +171,6 @@ void loop() {
 
   robot.run();
   // robot.printPose();
-#endif
 }
 
 // ============== FUNCTION DEFINITIONS ==============
@@ -283,8 +230,8 @@ void sendStatus() {
   robotData.speed[0] = leftMotorData.velocity;
   robotData.speed[1] = rightMotorData.velocity;
 
-  // sendStructData(robotData, DataType::ROBOT_STATUS);
-  sendString();
+  sendStructData(robotData, DataType::ROBOT_STATUS);
+  // sendString();
 }
 
 void SerialScan() {
@@ -441,8 +388,7 @@ void goToGoal(Pose currentPose, Pose goalPose) {
       if (front_distance < DISTANCE_THRESHOLD) {
         currentCmdVel.x = 0;
         currentCmdVel.w = MAX_ANGULAR_VELOCITY;
-      }
-      if (left_distance < DISTANCE_THRESHOLD) {
+      } else if (left_distance < DISTANCE_THRESHOLD) {
         I_left_sensor = left_distance;
         leftSensorPID.Compute();
         currentCmdVel.x = 0;
