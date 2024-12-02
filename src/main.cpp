@@ -148,6 +148,8 @@ void goToGoal(Pose currentPose, Pose goalPose);
 static unsigned long lastTime = 0;
 
 void loop() {
+  static Pose goalCoordinate = {0, 0, NAN};
+
   robot.setFrontDistance(ultrasonic2.read());
   robot.setLeftDistance(ultrasonic3.read());
   robot.setRightDistance(ultrasonic1.read());
@@ -158,10 +160,10 @@ void loop() {
 
   SerialScan();
 
-  if (AUTOMODE) {
-    goToGoal(currentPose, goalPose);
-  }
-  // goToGoal(currentPose, {1, 0, NAN});
+  goalCoordinate.x = 1;
+  goalCoordinate.y = 1;
+
+  goToGoal(currentPose, goalCoordinate);
 
   unsigned long currentTime = millis();
   if (currentTime - lastTime >= 50) {
